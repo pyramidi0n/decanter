@@ -59,6 +59,9 @@ Stop the application:
 Run it in a shell script:
 
 ```lisp
+#!/usr/bin/env -S sbcl --script
+(load "~/.sbclrc")
+
 (require :decanter)
 (use-package :decanter)
 
