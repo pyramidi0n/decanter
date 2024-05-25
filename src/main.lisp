@@ -43,6 +43,7 @@
    :target
    :headers
    :body
+   :clack-env
 
    :get-request
    :head-request
