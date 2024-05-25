@@ -60,6 +60,9 @@
    :set-content-type
    :body-string
 
+   :file-to-vector
+   :file-to-string
+
    ;; ---
 
    :response
@@ -1188,6 +1191,19 @@
 
 (defmethod body-string ((request request))
   (flexi-streams:octets-to-string (body request)))
+
+(defun file-to-vector (file-input-stream)
+  (declare (type (or null
+                     flexi-streams::vector-input-stream)
+                 file-input-stream))
+  (alexandria:read-stream-content-into-byte-vector file-input-stream))
+
+(defun file-to-string (file-input-stream)
+  (declare (type (or null
+                     flexi-streams::vector-input-stream)
+                 file-input-stream))
+  (flexi-streams:octets-to-string
+   (alexandria:read-stream-content-into-byte-vector file-input-stream)))
 
 ;; -----------------------------------------------------------------------------
 
