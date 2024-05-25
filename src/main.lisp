@@ -86,6 +86,7 @@
 
    :response-redirect
    :response-bad-request
+   :response-not-found
    :response-error
 
    :clack-response
@@ -976,40 +977,40 @@
                        (clack-application-handle-request)
                      (request-method-not-implemented (e)
                        (declare (ignore e))
-                       (clack-response (response-404 '(:content-type "text/plain") "Not Found")))
+                       (clack-response (response-404)))
                      (request-bad-target (e)
                        (declare (ignore e))
-                       (clack-response (response-400 '(:content-type "text/plain") "Bad Request")))
+                       (clack-response (response-400)))
                      (request-bad-query-parameters (e)
                        (declare (ignore e))
-                       (clack-response (response-400 '(:content-type "text/plain") "Bad Request")))
+                       (clack-response (response-400)))
                      (request-bad-body (e)
                        (declare (ignore e))
-                       (clack-response (response-400 '(:content-type "text/plain") "Bad Request")))
+                       (clack-response (response-400)))
                      (handler-function-does-not-exist (e)
                        (declare (ignore e))
-                       (clack-response (response-404 '(:content-type "text/plain") "Not Found")))
+                       (clack-response (response-404)))
                      (handler-function-return-value (e)
                        (declare (ignore e))
-                       (clack-response (response-500 '(:content-type "text/plain") "Internal Server Error")))
+                       (clack-response (response-500)))
                      (handler-function-request-parameter-type-coercion (e)
                        (declare (ignore e))
-                       (clack-response (response-400 '(:content-type "text/plain") "Bad Request")))
+                       (clack-response (response-400)))
                      (handler-function-request-parameter-malformatted (e)
                        (declare (ignore e))
-                       (clack-response (response-400 '(:content-type "text/plain") "Bad Request")))
+                       (clack-response (response-400)))
                      (handler-function-request-parameter-predicate-failed (e)
                        (declare (ignore e))
-                       (clack-response (response-400 '(:content-type "text/plain") "Bad Request")))
+                       (clack-response (response-400)))
                      (handler-function-request-parameter-required (e)
                        (declare (ignore e))
-                       (clack-response (response-400 '(:content-type "text/plain") "Bad Request")))
+                       (clack-response (response-400)))
                      (handler-function-params-plist-collision (e)
                        (declare (ignore e))
-                       (clack-response (response-400 '(:content-type "text/plain") "Bad Request")))
+                       (clack-response (response-400)))
                      (error (e)
                        (declare (ignore e))
-                       (clack-response (response-500 '(:content-type "text/plain") "Internal Server Error"))))
+                       (clack-response (response-500))))
                    (clack-application-handle-request)))))
     (labels ((start-clack ()
                (setf (clack-handler application)
@@ -1033,7 +1034,7 @@
                                   (declare (ignore e))
                                   ;; Error handler of last resort in case anything breaks in e.g. the Lack
                                   ;; middleware.
-                                  (clack-response (response-400 '(:content-type "text/plain") "Bad Request"))))
+                                  (clack-response (response-400))))
                               (run-clack-app))))
                       :address address
                       :port port)))
@@ -1371,13 +1372,19 @@
 (defun response-303 (location)
   (response 303 `(:location ,location) nil))
 
-(defun response-400 (&optional (headers '()) (body nil))
+(defun response-400 (&optional
+                       (headers '(:content-type "text/plain"))
+                       (body "Bad Request"))
   (response 400 headers body))
 
-(defun response-404 (&optional (headers '()) (body nil))
+(defun response-404 (&optional
+                       (headers '(:content-type "text/plain"))
+                       (body "Not Found"))
   (response 404 headers body))
 
-(defun response-500 (&optional (headers '()) (body nil))
+(defun response-500 (&optional
+                       (headers '(:content-type "text/plain"))
+                       (body "Internal Server Error"))
   (response 500 headers body))
 
 (defun response-text (body)
@@ -1395,10 +1402,19 @@
 (defun response-redirect (location)
   (response-303 location))
 
-(defun response-bad-request (&optional (headers '()) (body nil))
+(defun response-bad-request (&optional
+                               (headers '(:content-type "text/plain"))
+                               (body "Bad Request"))
   (response-400 headers body))
 
-(defun response-error (&optional (headers '()) (body nil))
+(defun response-not-found (&optional
+                             (headers '(:content-type "text/plain"))
+                             (body "Not Found"))
+  (response-404 headers body))
+
+(defun response-error (&optional
+                         (headers '(:content-type "text/plain"))
+                         (body "Internal Server Error"))
   (response-500 headers body))
 
 (defmethod clack-response ((response response))
