@@ -1001,7 +1001,7 @@
                      (handler-function-request-parameter-required (e)
                        (declare (ignore e))
                        (clack-response (response-400 '(:content-type "text/plain") "Bad Request")))
-                     (handler-function-request-params-plist-collision (e)
+                     (handler-function-params-plist-collision (e)
                        (declare (ignore e))
                        (clack-response (response-400 '(:content-type "text/plain") "Bad Request")))
                      (error (e)
@@ -1076,9 +1076,11 @@
 (defclass request ()
   ((method
     :initarg :method
+    :initform nil
     :accessor request-method)
    (target
     :initarg :target
+    :initform nil
     :accessor target)
    (headers
     :initarg :headers
@@ -1097,7 +1099,7 @@
    (clack-env
     :initarg :clack-env
     :initform '()
-    :accessor clack-env)))
+    :reader clack-env)))
 
 (defun request (&optional
                   (method :get)
