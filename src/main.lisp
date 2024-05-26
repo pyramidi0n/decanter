@@ -1011,7 +1011,15 @@
                      (error (e)
                        (declare (ignore e))
                        (clack-response (response-500))))
-                   (clack-application-handle-request)))))
+                   (handler-case
+                       (clack-application-handle-request)
+                     (handler-function-does-not-exist (e)
+                       ;; Even when we're not in a production environment, this
+                       ;; is useful because it prevents the application from
+                       ;; pausing if e.g. a browser requests a favicon that
+                       ;; isn't present.
+                       (declare (ignore e))
+                       (clack-response (response-404))))))))
     (labels ((start-clack ()
                (setf (clack-handler application)
                      (clack:clackup
