@@ -40,7 +40,7 @@ A minimal `decanter` application:
 (use-package :decanter)
 
 (defurls *urls*
-    '("/(.*)" :regex hello))
+    '("/" hello))
 
 (defapp *app* *urls*)
 
@@ -66,7 +66,7 @@ Run it in a shell script:
 (use-package :decanter)
 
 (defurls *urls*
-    '("/(.*)" :regex hello))
+    '("/" hello))
 
 (defapp *app* *urls*)
 
