@@ -2,7 +2,11 @@
 (defpackage :decanter
   (:use
    :cl)
+  (:import-from :spinneret
+                #:escape-string)
   (:export
+   :escape-string
+
    ;; ---
 
    :url-regex-sugar
