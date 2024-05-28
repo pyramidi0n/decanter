@@ -1437,11 +1437,12 @@
 ;; -----------------------------------------------------------------------------
 
 (defmacro with-html-string (&body body)
-  `(let* ((returned-str nil)
-          (written-html
-            (with-output-to-string (spinneret:*html*)
-              (setf returned-str (spinneret:with-html ,@body)))))
-     (if returned-str returned-str written-html)))
+  (let ((returned-str (gensym)))
+    `(let* ((,returned-str nil)
+            (written-html
+              (with-output-to-string (spinneret:*html*)
+                (setf ,returned-str (spinneret:with-html ,@body)))))
+       (if ,returned-str ,returned-str written-html))))
 
 ;; -----------------------------------------------------------------------------
 
