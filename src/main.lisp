@@ -1141,6 +1141,7 @@
                                            (lack.builder:builder
                                             `(:static :path ,(static-url-prefix application)
                                                       :root ,(static-directory application))
+                                            :session
                                             #'clack-application)))
                                      (mapcar (lambda (m)
                                                (setf clack-application-with-middleware
@@ -1214,6 +1215,10 @@
     :initarg :body
     :initform nil
     :accessor body)
+   (cookies
+    :initarg :cookies
+    :initform '()
+    :accessor cookies)
    ;; Decanter includes the Clack environment in request objects in the event
    ;; end users have a use for it in their handlers. However, we don't make
    ;; any use of this internally once a request object is constructed.
@@ -1230,40 +1235,42 @@
                   (target "/")
                   (headers '())
                   (body nil)
+                  (cookies '())
                   (clack-env '()))
   (make-instance 'request
                  :method method
                  :target target
                  :headers headers
                  :body body
+                 :cookies cookies
                  :clack-env clack-env))
 
-(defun get-request (target &optional (headers '()) (clack-env '()))
-  (request :get target headers nil clack-env))
+(defun get-request (target &optional (headers '()) (cookies '()) (clack-env '()))
+  (request :get target headers nil cookies clack-env))
 
-(defun head-request (target &optional (headers '()) (clack-env '()))
-  (request :head target headers nil clack-env))
+(defun head-request (target &optional (headers '()) (cookies '()) (clack-env '()))
+  (request :head target headers nil cookies clack-env))
 
-(defun post-request (target headers body &optional (clack-env '()))
-  (request :post target headers body clack-env))
+(defun post-request (target headers body &optional (cookies '()) (clack-env '()))
+  (request :post target headers body cookies clack-env))
 
-(defun put-request (target headers body &optional (clack-env '()))
-  (request :put target headers body clack-env))
+(defun put-request (target headers body &optional (cookies '()) (clack-env '()))
+  (request :put target headers body cookies clack-env))
 
-(defun delete-request (target &optional (headers '()) (body nil) (clack-env '()))
-  (request :delete target headers body clack-env))
+(defun delete-request (target &optional (headers '()) (body nil) (cookies '()) (clack-env '()))
+  (request :delete target headers body cookies clack-env))
 
-(defun connect-request (target &optional (headers '()) (clack-env '()))
-  (request :connect target headers nil clack-env))
+(defun connect-request (target &optional (headers '()) (cookies '()) (clack-env '()))
+  (request :connect target headers nil cookies clack-env))
 
-(defun options-request (target &optional (headers '()) (clack-env '()))
-  (request :options target headers nil clack-env))
+(defun options-request (target &optional (headers '()) (cookies '()) (clack-env '()))
+  (request :options target headers nil cookies clack-env))
 
-(defun trace-request (target &optional (headers '()) (clack-env '()))
-  (request :trace target headers nil clack-env))
+(defun trace-request (target &optional (headers '()) (cookies '()) (clack-env '()))
+  (request :trace target headers nil cookies clack-env))
 
-(defun patch-request (target headers body &optional (clack-env '()))
-  (request :patch target headers body clack-env))
+(defun patch-request (target headers body &optional (cookies '()) (clack-env '()))
+  (request :patch target headers body cookies clack-env))
 
 (defun request-from-clack (clack-env)
   (labels ((has-content-p ()
@@ -1295,17 +1302,18 @@
                           :content-length (getf clack-env :content-length))
                     (keyword-keyed-plist
                      (alexandria:hash-table-plist (getf clack-env :headers)))))
-          (body (body-octets)))
+          (body (body-octets))
+          (cookies (getf clack-env :cookies)))
       (case (getf clack-env :request-method)
-        (:get     (get-request     target headers      clack-env))
-        (:head    (head-request    target headers      clack-env))
-        (:post    (post-request    target headers body clack-env))
-        (:put     (put-request     target headers body clack-env))
-        (:delete  (delete-request  target headers body clack-env))
-        (:connect (connect-request target headers      clack-env))
-        (:options (options-request target headers      clack-env))
-        (:trace   (trace-request   target headers      clack-env))
-        (:patch   (patch-request   target headers body clack-env))))))
+        (:get     (get-request     target headers      cookies clack-env))
+        (:head    (head-request    target headers      cookies clack-env))
+        (:post    (post-request    target headers body cookies clack-env))
+        (:put     (put-request     target headers body cookies clack-env))
+        (:delete  (delete-request  target headers body cookies clack-env))
+        (:connect (connect-request target headers      cookies clack-env))
+        (:options (options-request target headers      cookies clack-env))
+        (:trace   (trace-request   target headers      cookies clack-env))
+        (:patch   (patch-request   target headers body cookies clack-env))))))
 
 (defmethod set-content-type ((request request) content-type)
   (setf (getf (headers request) :content-type) content-type))
@@ -1325,6 +1333,9 @@
                  file-input-stream))
   (flexi-streams:octets-to-string
    (alexandria:read-stream-content-into-byte-vector file-input-stream)))
+
+(defmethod get-cookie ((request request) key)
+  (cdr (assoc key (cookies request) :test #'string=)))
 
 ;; -----------------------------------------------------------------------------
 
@@ -1475,19 +1486,24 @@
    (body
     :initarg :body
     :initform nil
-    :accessor body)))
+    :accessor body)
+   (cookies
+    :initarg :cookies
+    :initform '()
+    :accessor cookies)))
 
 (defun responsep (obj)
   (equalp (type-of obj) 'response))
 
-(defun response (&optional (code 200) (headers '()) (body nil))
+(defun response (&optional (code 200) (headers '()) (body nil) (cookies '()))
   (make-instance 'response
                  :code code
                  :headers headers
-                 :body body))
+                 :body body
+                 :cookies cookies))
 
-(defun response-200 (&optional (headers '()) (body nil))
-  (response 200 headers body))
+(defun response-200 (&optional (headers '()) (body nil) (cookies '()))
+  (response 200 headers body cookies))
 
 (defun response-303 (location)
   (response 303 `(:location ,location) nil))
@@ -1537,10 +1553,38 @@
                          (body "Internal Server Error"))
   (response-500 headers body))
 
+(defun cookie-str (k v)
+  ;; Right now this wraps a function internal to Lack. Not ideal.
+  (lack.response::bake-cookie k v))
+
 (defmethod clack-response ((response response))
   (list (code response)
-        (headers response)
+        (append (headers response)
+                (loop for (k v) on (cookies response) by #'cddr
+                      append (list :set-cookie (cookie-str k v))))
         (list (body response))))
+
+(defmethod set-cookie ((response response) key &key
+                                                 (value "")
+                                                 expires
+                                                 (path "/")
+                                                 domain
+                                                 secure
+                                                 httponly
+                                                 samesite)
+  (let ((existing-kv (assoc key (cookies response) :test #'string=))
+        (cookie-v (list :value value
+                        :expires expires
+                        :path path
+                        :domain domain
+                        :secure secure
+                        :httponly httponly
+                        :samesite samesite)))
+    (if existing-kv
+        (setf (cdr (assoc key (cookies response) :test #'string=))
+              cookie-v)
+        (setf (cookies response)
+              (acons key cookie-v (cookies response))))))
 
 ;; -----------------------------------------------------------------------------
 
