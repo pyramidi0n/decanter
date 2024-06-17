@@ -34,6 +34,9 @@
 
    :add-mapping
 
+   :handler-url
+   :static-url
+
    :run
    :stop
 
@@ -569,22 +572,38 @@
                              :target (target request)
                              :pattern pattern)))))
       `(defun ,handler-name ,lambda-list
-         (apply
-          (funcall
-           (lambda ()
-             (case (request-method request)
-               (:get     ,(wrap-subhandler (form-by-method :get     body)))
-               (:head    ,(wrap-subhandler (form-by-method :head    body)))
-               (:post    ,(wrap-subhandler (form-by-method :post    body)))
-               (:put     ,(wrap-subhandler (form-by-method :put     body)))
-               (:delete  ,(wrap-subhandler (form-by-method :delete  body)))
-               (:connect ,(wrap-subhandler (form-by-method :connect body)))
-               (:options ,(wrap-subhandler (form-by-method :options body)))
-               (:trace   ,(wrap-subhandler (form-by-method :trace   body)))
-               (:patch   ,(wrap-subhandler (form-by-method :patch   body))))))
-          (append (list ,application ,request ,pattern ,pattern-matches) ,request-parameters-plist))))))
+         (macrolet ((handler-url (handler &rest rest)
+                      `(handler-url-tl application ,handler ,@rest))
+                    (static-url (&key
+                                   path
+                                   (subpath "")
+                                   filename
+                                   pathname)
+                      `(static-url-tl application
+                                      :path ,path
+                                      :subpath ,subpath
+                                      :filename ,filename
+                                      :pathname ,pathname)))
+           (apply
+            (funcall
+             (lambda ()
+               (case (request-method request)
+                 (:get     ,(wrap-subhandler (form-by-method :get     body)))
+                 (:head    ,(wrap-subhandler (form-by-method :head    body)))
+                 (:post    ,(wrap-subhandler (form-by-method :post    body)))
+                 (:put     ,(wrap-subhandler (form-by-method :put     body)))
+                 (:delete  ,(wrap-subhandler (form-by-method :delete  body)))
+                 (:connect ,(wrap-subhandler (form-by-method :connect body)))
+                 (:options ,(wrap-subhandler (form-by-method :options body)))
+                 (:trace   ,(wrap-subhandler (form-by-method :trace   body)))
+                 (:patch   ,(wrap-subhandler (form-by-method :patch   body))))))
+            (append (list ,application ,request ,pattern ,pattern-matches) ,request-parameters-plist)))))))
 
 ;; -----------------------------------------------------------------------------
+
+(defun key-to-str (k)
+  (string-downcase
+   (subseq (write-to-string k) 1)))
 
 (defun sym-to-keyword (sym)
   (intern (symbol-name sym) "KEYWORD"))
@@ -663,6 +682,86 @@
                 (if regex
                     (list pattern :regex handler)
                     (list pattern handler)))))
+
+(defun handler-url-fn (application handler &rest rest)
+  ;; (handler-url *app* hello :name "John Doe")
+  ;;
+  ;; Possibly omit the application if this (or some variant)
+  ;; is called within a handler.
+  ;;
+  ;; (handler-url hello :name "John Doe")
+  ;;
+  ;; Likewise for static-url
+  ;;
+  ;; (static-url :filename "style.css")
+  ;;
+  ;; To achieve the latter two, we may need to macrolet them
+  ;; within the defhandler macro, so that they overload
+  ;; the static-url and handler-url methods more generally
+  ;; available.
+  (let* ((mapping (mapping application))
+         (i (position handler mapping :test #'eq))
+         (string-pattern? nil)
+         (pattern (when (>= (1- i) 0)
+                    (if (eq :regex (nth (1- i) mapping))
+                        (when (>= (- i 2) 0)
+                          (nth (- i 2) mapping))
+                        (progn
+                          (setf string-pattern? t)
+                          (nth (1- i) mapping))))))
+    (when pattern
+      (if string-pattern?
+          (let* ((pattern-vars-bound pattern))
+            (loop for (k v) on rest by #'cddr
+                  do (let* ((var-bind-start-pos
+                              (search (concatenate 'string "(" (key-to-str k)) pattern-vars-bound))
+                            (var-bind-end-pos
+                              (search ")" pattern-vars-bound :start2 var-bind-start-pos))
+                            (pattern-next-var-bound
+                              (concatenate 'string
+                                           (subseq pattern-vars-bound 0 var-bind-start-pos)
+                                           (if (stringp v) v (write-to-string v))
+                                           (subseq pattern-vars-bound (1+ var-bind-end-pos)))))
+                       (setf pattern-vars-bound pattern-next-var-bound)))
+            pattern-vars-bound)
+          pattern))))
+
+(defmacro handler-url (application handler &rest rest)
+  `(handler-url-fn ,application (quote ,handler) ,@rest))
+
+(defmacro handler-url-tl (application handler &rest rest)
+  ;; Used internally to avoid recursive macroexpansion issues when
+  ;; rebinding handler-url inside defhandler.
+  `(handler-url-fn ,application (quote ,handler) ,@rest))
+
+(defmethod static-url ((application application) &key
+                                                   path
+                                                   (subpath "")
+                                                   filename
+                                                   pathname)
+  (let ((url-str (if path
+                     (concatenate 'string
+                                  (static-url-prefix application)
+                                  path)
+                     (concatenate 'string
+                                  (static-url-prefix application)
+                                  subpath
+                                  filename))))
+    (if pathname (pathname url-str) url-str)))
+
+(defmacro static-url-tl (application &key
+                                       path
+                                       subpath
+                                       filename
+                                       pathname)
+  ;; Used internally to avoid recursive macroexpansion issues when
+  ;; rebinding static-url inside defhandler.
+  `(funcall ,#'static-url
+            ,application
+            :path ,path
+            :subpath ,subpath
+            :filename ,filename
+            :pathname ,pathname))
 
 (defmethod run ((application application) &key
                                             middleware
