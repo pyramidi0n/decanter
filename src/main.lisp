@@ -1073,7 +1073,8 @@
                               (format t "* method: ~s~%" (request-method request))
                               (format t "* target: ~s~%" (target request))
                               (format t "* headers: ~s~%" (headers request))
-                              (format t "* body: ~s~%" (body-string request)))
+                              (format t "* body: ~s~%" (body-string request))
+                              (format t "* cookies: ~s~%" (cookies request)))
                             (let ((clack-response
                                     (wrap-response
                                      (request-method request) (target request) pattern
@@ -1566,8 +1567,10 @@
 (defmethod clack-response ((response response))
   (list (code response)
         (append (headers response)
-                (loop for (k v) on (cookies response) by #'cddr
-                      append (list :set-cookie (cookie-str k v))))
+                (loop for pair in (cookies response)
+                      append (let ((k (car pair))
+                                   (v (cdr pair)))
+                               (list :set-cookie (cookie-str k v)))))
         (list (body response))))
 
 (defmethod set-cookie ((response response) key &key
