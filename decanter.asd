@@ -26,6 +26,7 @@
                "lack-util"
                "lack-util-writer-stream"
                "parse-number"
+               "quri"
                "spinneret"
                "uiop"
                "uri-parse")

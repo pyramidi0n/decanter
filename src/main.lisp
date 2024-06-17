@@ -4,8 +4,16 @@
    :cl)
   (:import-from :spinneret
                 #:escape-string)
+  (:import-from :quri
+                #:url-decode
+                #:url-encode)
   (:export
    :escape-string
+
+   ;; ---
+
+   :url-decode
+   :url-encode
 
    ;; ---
 
@@ -684,21 +692,6 @@
                     (list pattern handler)))))
 
 (defun handler-url-fn (application handler &rest rest)
-  ;; (handler-url *app* hello :name "John Doe")
-  ;;
-  ;; Possibly omit the application if this (or some variant)
-  ;; is called within a handler.
-  ;;
-  ;; (handler-url hello :name "John Doe")
-  ;;
-  ;; Likewise for static-url
-  ;;
-  ;; (static-url :filename "style.css")
-  ;;
-  ;; To achieve the latter two, we may need to macrolet them
-  ;; within the defhandler macro, so that they overload
-  ;; the static-url and handler-url methods more generally
-  ;; available.
   (let* ((mapping (mapping application))
          (i (position handler mapping :test #'eq))
          (string-pattern? nil)
@@ -711,19 +704,35 @@
                           (nth (1- i) mapping))))))
     (when pattern
       (if string-pattern?
-          (let* ((pattern-vars-bound pattern))
-            (loop for (k v) on rest by #'cddr
-                  do (let* ((var-bind-start-pos
-                              (search (concatenate 'string "(" (key-to-str k)) pattern-vars-bound))
-                            (var-bind-end-pos
-                              (search ")" pattern-vars-bound :start2 var-bind-start-pos))
-                            (pattern-next-var-bound
-                              (concatenate 'string
-                                           (subseq pattern-vars-bound 0 var-bind-start-pos)
-                                           (if (stringp v) v (write-to-string v))
-                                           (subseq pattern-vars-bound (1+ var-bind-end-pos)))))
-                       (setf pattern-vars-bound pattern-next-var-bound)))
-            pattern-vars-bound)
+          (let* ((pattern-vars-bound pattern)
+                 (query-string "?"))
+            (labels ((query-string-empty-p ()
+                       (string= query-string "?")))
+              (loop for (k v) on rest by #'cddr
+                    do (let* ((k-str (key-to-str k))
+                              (v-str (if (stringp v) v (write-to-string v)))
+                              (var-bind-start-pos
+                                (search (concatenate 'string "(" k-str) pattern-vars-bound))
+                              (var-bind-end-pos
+                                (when var-bind-start-pos
+                                  (search ")" pattern-vars-bound :start2 var-bind-start-pos)))
+                              (pattern-next-var-bound
+                                (when (and var-bind-start-pos var-bind-end-pos)
+                                  (concatenate 'string
+                                               (subseq pattern-vars-bound 0 var-bind-start-pos)
+                                               (url-encode v-str)
+                                               (subseq pattern-vars-bound (1+ var-bind-end-pos))))))
+                         (if pattern-next-var-bound
+                             (setf pattern-vars-bound pattern-next-var-bound)
+                             (setf query-string (concatenate 'string
+                                                             query-string
+                                                             (if (query-string-empty-p) "" "&")
+                                                             (url-encode k-str)
+                                                             "="
+                                                             (url-encode v-str))))))
+              (concatenate 'string
+                           pattern-vars-bound
+                           (if (query-string-empty-p) "" query-string))))
           pattern))))
 
 (defmacro handler-url (application handler &rest rest)
