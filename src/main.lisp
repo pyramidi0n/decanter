@@ -58,6 +58,7 @@
    :target
    :headers
    :body
+   :cookies
    :clack-env
 
    :get-request
@@ -78,6 +79,8 @@
    :file-to-vector
    :file-to-string
 
+   :get-cookie
+
    ;; ---
 
    :response
@@ -85,6 +88,7 @@
    :code
    :headers
    :body
+   :cookies
 
    :responsep
 
@@ -105,6 +109,8 @@
    :response-error
 
    :clack-response
+
+   :set-cookie
 
    ;; ---
 
