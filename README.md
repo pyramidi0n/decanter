@@ -2,9 +2,6 @@
 
 A micro web framework that gets out of your way.
 
-Note that Decanter is alpha-quality software. It lacks a test suite and good
-documentation; both are forthcoming.
-
 ## Table of Contents
 
 1. [Installation](#installation)
@@ -33,7 +30,7 @@ Install Decanter:
 
 ## Usage
 
-A minimal `decanter` application:
+A minimal Decanter application:
 
 ```lisp
 (require :decanter)
@@ -56,35 +53,15 @@ Stop the application:
 (stop *app*)
 ```
 
-Run it in a shell script:
-
-```lisp
-#!/usr/bin/env -S sbcl --script
-(load "~/.sbclrc")
-
-(require :decanter)
-(use-package :decanter)
-
-(defurls *urls*
-    '("/" hello))
-
-(defapp *app* *urls*)
-
-(defhandler hello
-  (:get () "Hello, world!"))
-
-(run *app* :standalone t)
-```
-
 Stop the application with Ctrl+C/SIGINT.
 
 ## Documentation
 
-Additional documentation is forthcoming.
+Thorough documentation is available [here](https://decanter.cddr.io/).
 
 ## Links
 
-* [Repository](https://sr.ht/~pyramidion/decanter/)
+* [Repository](https://git.sr.ht/~pyramidion/decanter/)
 
 ## Patches
 
