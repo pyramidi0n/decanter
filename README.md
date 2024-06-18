@@ -53,8 +53,6 @@ Stop the application:
 (stop *app*)
 ```
 
-Stop the application with Ctrl+C/SIGINT.
-
 ## Documentation
 
 Thorough documentation is available [here](https://decanter.cddr.io/).
