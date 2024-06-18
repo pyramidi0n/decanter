@@ -6,7 +6,7 @@
   :depends-on ("alexandria"
                "cl-ppcre"
                "clack"
-               "clack-handler-hunchentoot"
+               "clack-handler-woo"
                "clack-socket"
                "flexi-streams"
                "http-body"
@@ -29,7 +29,9 @@
                "quri"
                "spinneret"
                "uiop"
-               "uri-parse")
+               "uri-parse"
+               "woo"
+               "vom")
   :components ((:module "src"
                 :components
                 ((:file "main.lisp" :pathname "main")))))
