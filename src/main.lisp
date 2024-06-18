@@ -14,6 +14,12 @@
 
    ;;---
 
+   :*log-level*
+   :*log-file-name*
+   :*log-if-exists*
+
+   ;;---
+
    :escape-string
 
    ;; ---
@@ -50,6 +56,11 @@
 
    :handler-url
    :static-url
+
+   :log-debug
+   :log-info
+   :log-warning
+   :log-error
 
    :run
    :stop
@@ -144,6 +155,10 @@
 
 (defparameter *default-static-url-prefix* "/static/")
 (defparameter *default-static-url-relative-path* #P"static/")
+
+(defparameter *log-level* :debug)
+(defparameter *log-file-name* "decanter.log")
+(defparameter *log-if-exists* :append)
 
 ;; -----------------------------------------------------------------------------
 
@@ -699,7 +714,11 @@
    (static-directory
     :initarg :static-directory
     :initform (merge-pathnames *default-static-url-relative-path* (uiop/os:getcwd))
-    :accessor static-directory)))
+    :accessor static-directory)
+   (log-file-stream
+    :initarg :log-file-stream
+    :initform nil
+    :accessor log-file-stream)))
 
 (defmethod (setf mapping) (mapping (application application))
   (setf (slot-value application 'mapping) (alexandria:flatten mapping)))
@@ -807,12 +826,29 @@
             :filename ,filename
             :pathname ,pathname))
 
+(defmacro log-debug (application fmt-str &rest rest)
+  (declare (ignore application))
+  `(vom:debug ,fmt-str ,@rest))
+
+(defmacro log-info (application fmt-str &rest rest)
+  (declare (ignore application))
+  `(vom:info ,fmt-str ,@rest))
+
+(defmacro log-warning (application fmt-str &rest rest)
+  (declare (ignore application))
+  `(vom:warn ,fmt-str ,@rest))
+
+(defmacro log-error (application fmt-str &rest rest)
+  (declare (ignore application))
+  `(vom:error ,fmt-str ,@rest))
+
 (defmethod run ((application application) &key
                                             middleware
                                             standalone
                                             (address "127.0.0.1")
                                             (port 5000)
-                                            session)
+                                            session
+                                            logging)
   ;; middleware is a list of Clack middleware.
   (labels ((find-handler (method target)
              (let ((mapping (mapping application))
@@ -1088,6 +1124,14 @@
                              :method method
                              :target target
                              :pattern pattern))))
+           (start-logging ()
+             (vom:config t *log-level*)
+             (setf (log-file-stream application)
+                   (open (merge-pathnames (pathname *log-file-name*) (application-directory application))
+                         :direction :output
+                         :if-exists *log-if-exists*
+                         :if-does-not-exist :create))
+             (setf vom:*log-stream* (log-file-stream application)))
            (clack-application (env)
              (labels ((clack-application-handle-request ()
                         (let ((request (request-from-clack env)))
@@ -1098,8 +1142,7 @@
                               (format t "------------~%")
                               (format t "HTTP REQUEST~%")
                               (format t "------------~%")
-                              (format t "~%env: ~s~%" env)
-                              (format t "~%request: ~s~%" request)
+                              (format t "request:~%")
                               (format t "* method: ~s~%" (request-method request))
                               (format t "* target: ~s~%" (target request))
                               (format t "* headers: ~s~%" (headers request))
@@ -1212,12 +1255,14 @@
                                     ;; middleware.
                                     (clack-response (response-400))))
                                 (run-clack-app))))
+                        :server :woo
                         :address address
                         :port port))))
              (run-as-standalone ()
                (unwind-protect
                     (handler-case
                         (progn
+                          (when logging (start-logging))
                           (start-clack)
                           (sleep most-positive-fixnum))
                       (sb-sys:interactive-interrupt (c)
@@ -1227,13 +1272,20 @@
                    (stop application)
                    (format t "Done!~%"))))
              (run-in-repl ()
+               (when logging (start-logging))
                (start-clack)))
       (if standalone
           (run-as-standalone)
           (run-in-repl)))))
 
 (defmethod stop ((application application))
-  (clack:stop (clack-handler application)))
+  (labels ((stop-logging ()
+             (when (log-file-stream application)
+               (close (log-file-stream application))
+               (setf vom:*log-stream* nil)
+               (setf (log-file-stream application) nil))))
+    (stop-logging)
+    (clack:stop (clack-handler application))))
 
 (defmacro defapp (sym
                   mapping
