@@ -2,12 +2,18 @@
 (defpackage :decanter
   (:use
    :cl)
+  (:import-from :lack/middleware/session/store/memory
+                #:make-memory-store)
   (:import-from :spinneret
                 #:escape-string)
   (:import-from :quri
                 #:url-decode
                 #:url-encode)
   (:export
+   :*middleware-session*
+
+   ;;---
+
    :escape-string
 
    ;; ---
@@ -81,6 +87,14 @@
 
    :get-cookie
 
+   :session-id
+   :session-options
+   :session-table
+   :session
+   :set-session
+   :rem-session
+   :clear-session
+
    ;; ---
 
    :response
@@ -114,12 +128,13 @@
 
    ;; ---
 
-   :with-html-string
-
-   ;;---
-
-   :*middleware-session*))
+   :with-html-string))
 (in-package :decanter)
+
+;; -----------------------------------------------------------------------------
+
+(defparameter *middleware-session*
+  lack/middleware/session:*lack-middleware-session*)
 
 ;; -----------------------------------------------------------------------------
 
@@ -597,7 +612,21 @@
                                       :path ,path
                                       :subpath ,subpath
                                       :filename ,filename
-                                      :pathname ,pathname)))
+                                      :pathname ,pathname))
+                    (session-id ()
+                      `(session-id-tl request))
+                    (session-options ()
+                      `(session-options-tl request))
+                    (session-table ()
+                      `(session-table-tl request))
+                    (session (key)
+                      `(session-tl request ,key))
+                    (set-session (key value)
+                      `(set-session-tl request ,key ,value))
+                    (rem-session (key)
+                      `(rem-session-tl request ,key))
+                    (clear-session ()
+                      `(clear-session-tl request)))
            (apply
             (funcall
              (lambda ()
@@ -782,7 +811,8 @@
                                             middleware
                                             standalone
                                             (address "127.0.0.1")
-                                            (port 5000))
+                                            (port 5000)
+                                            session)
   ;; middleware is a list of Clack middleware.
   (labels ((find-handler (method target)
              (let ((mapping (mapping application))
@@ -1140,32 +1170,50 @@
                        (declare (ignore e))
                        (clack-response (response-404))))))))
     (labels ((start-clack ()
-               (setf (clack-handler application)
-                     (clack:clackup
-                      (lambda (env)
-                        (labels ((run-clack-app ()
-                                   (let ((clack-application-with-middleware
-                                           (lack.builder:builder
-                                            `(:static :path ,(static-url-prefix application)
-                                                      :root ,(static-directory application))
-                                            :session
-                                            #'clack-application)))
-                                     (mapcar (lambda (m)
-                                               (setf clack-application-with-middleware
-                                                     (funcall m clack-application-with-middleware)))
-                                             middleware)
-                                     (funcall clack-application-with-middleware env))))
-                          (if (production application)
-                              (handler-case
-                                  (run-clack-app)
-                                (error (e)
-                                  (declare (ignore e))
-                                  ;; Error handler of last resort in case anything breaks in e.g. the Lack
-                                  ;; middleware.
-                                  (clack-response (response-400))))
-                              (run-clack-app))))
-                      :address address
-                      :port port)))
+               (let ((session-store (make-memory-store)))
+                 ;; Apparently Lack's session middleware defaults to creating a
+                 ;; new memory store for each request. This means that any use
+                 ;; of the session hash table is, by default, useless, since
+                 ;; that table is blown away and recreated. Every single time.
+                 ;;
+                 ;; Nevertheless, this hash table is accessible in the Clack
+                 ;; environment, which suggests that it might have utility.
+                 ;; But, no, apparently you have to fuck around before it's
+                 ;; useful.
+                 ;;
+                 ;; Why this is the default behavior? I have no idea. It's not
+                 ;; like there's any documentation.
+                 ;;
+                 ;; "There are five libraries, and all of them suck."
+                 (when session
+                   (push (lambda (app)
+                           (funcall *middleware-session* app :store session-store))
+                         middleware))
+                 (setf (clack-handler application)
+                       (clack:clackup
+                        (lambda (env)
+                          (labels ((run-clack-app ()
+                                     (let ((clack-application-with-middleware
+                                             (lack.builder:builder
+                                              `(:static :path ,(static-url-prefix application)
+                                                        :root ,(static-directory application))
+                                              #'clack-application)))
+                                       (mapcar (lambda (m)
+                                                 (setf clack-application-with-middleware
+                                                       (funcall m clack-application-with-middleware)))
+                                               middleware)
+                                       (funcall clack-application-with-middleware env))))
+                            (if (production application)
+                                (handler-case
+                                    (run-clack-app)
+                                  (error (e)
+                                    (declare (ignore e))
+                                    ;; Error handler of last resort in case anything breaks in e.g. the Lack
+                                    ;; middleware.
+                                    (clack-response (response-400))))
+                                (run-clack-app))))
+                        :address address
+                        :port port))))
              (run-as-standalone ()
                (unwind-protect
                     (handler-case
@@ -1227,8 +1275,7 @@
     :initform '()
     :accessor cookies)
    ;; Decanter includes the Clack environment in request objects in the event
-   ;; end users have a use for it in their handlers. However, we don't make
-   ;; any use of this internally once a request object is constructed.
+   ;; end users have a use for it in their handlers.
    ;;
    ;; Note that the process of constructing a request object renders the
    ;; :raw-body stream in clack-env subsequently unusable.
@@ -1343,6 +1390,52 @@
 
 (defmethod get-cookie ((request request) key)
   (cdr (assoc key (cookies request) :test #'string=)))
+
+(defmethod session-id-tl ((request request))
+  (getf (getf (clack-env request) :lack.session.options) :id))
+
+(defmethod session-options-tl ((request request))
+  (getf (clack-env request) :lack.session.options))
+
+(defmethod session-table-tl ((request request))
+  (getf (clack-env request) :lack.session))
+
+(defmethod session-tl ((request request) key)
+  (gethash key (getf (clack-env request) :lack.session)))
+
+(defmethod set-session-tl ((request request) key value)
+  (setf (gethash key (getf (clack-env request) :lack.session)) value))
+
+(defmethod rem-session-tl ((request request) key)
+  (remhash key (getf (clack-env request) :lack.session)))
+
+(defmethod clear-session-tl ((request request))
+  (let ((session-table (getf (clack-env request) :lack.session)))
+    (maphash (lambda (key value)
+               (declare (ignore value))
+               (remhash key session-table))
+             session-table)))
+
+(defmacro session-id (request)
+  `(session-id-tl ,request))
+
+(defmacro session-options (request)
+  `(session-options-tl ,request))
+
+(defmacro session-table (request)
+  `(session-table-tl ,request))
+
+(defmacro session (request key)
+  `(session-tl ,request ,key))
+
+(defmacro set-session (request key value)
+  `(set-session-tl ,request ,key ,value))
+
+(defmacro rem-session (request key)
+  `(rem-session-tl ,request ,key))
+
+(defmacro clear-session (request)
+  `(clear-session-tl ,request))
 
 ;; -----------------------------------------------------------------------------
 
@@ -1605,8 +1698,3 @@
               (with-output-to-string (spinneret:*html*)
                 (setf ,returned-str (spinneret:with-html ,@body)))))
        (if ,returned-str ,returned-str ,written-html))))
-
-;; -----------------------------------------------------------------------------
-
-(defparameter *middleware-session*
-  lack/middleware/session:*lack-middleware-session*)
