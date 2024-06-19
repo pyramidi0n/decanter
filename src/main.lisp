@@ -127,6 +127,7 @@
    :response-html
    :response-css
    :response-js
+   :response-json
 
    :response-redirect
    :response-bad-request
@@ -141,6 +142,10 @@
 
    :with-html-string))
 (in-package :decanter)
+
+;; -----------------------------------------------------------------------------
+
+(json:use-explicit-encoder)
 
 ;; -----------------------------------------------------------------------------
 
@@ -1120,6 +1125,7 @@
            (wrap-response (method target pattern val)
              (cond ((stringp val) (clack-response (response-html val)))
                    ((responsep val) (clack-response val))
+                   ((listp val) (clack-response (response-json (json:encode-json-to-string val))))
                    (t (error 'handler-function-return-value
                              :method method
                              :target target
@@ -1686,6 +1692,9 @@
 
 (defun response-js (body)
   (response-200 '(:content-type "text/javascript") body))
+
+(defun response-json (body)
+  (response-200 '(:content-type "application/json") body))
 
 (defun response-redirect (location)
   (response-303 location))

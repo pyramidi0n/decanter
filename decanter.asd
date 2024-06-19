@@ -4,6 +4,7 @@
   :author "Stephen Youts"
   :license "BSD-2"
   :depends-on ("alexandria"
+               "cl-json"
                "cl-ppcre"
                "clack"
                "clack-handler-woo"
@@ -33,5 +34,4 @@
                "woo"
                "vom")
   :components ((:module "src"
-                :components
-                ((:file "main.lisp" :pathname "main")))))
+                :components ((:file "main.lisp" :pathname "main")))))
