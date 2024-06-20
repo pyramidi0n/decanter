@@ -55,7 +55,7 @@ Stop the application:
 
 ## Documentation
 
-Thorough documentation is available [here](https://decanter.cddr.io/).
+Thorough documentation is available [here](https://decanter.cddr.io/docs/).
 
 ## Links
 
