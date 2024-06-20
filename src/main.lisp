@@ -140,7 +140,11 @@
 
    ;; ---
 
-   :with-html-string))
+   :with-html-string
+
+   ;; ---
+
+   :app))
 (in-package :decanter)
 
 ;; -----------------------------------------------------------------------------
@@ -174,7 +178,11 @@
              (declare (ignore rest))
              (let* ((url (read stream t nil t))
                     (handler (read stream t nil t)))
-               (when (not (and (stringp url) (symbolp handler)))
+               (when (not (and (stringp url) (or (symbolp handler)
+                                                 (and (listp handler)
+                                                      (>= (length handler) 2)
+                                                      (keywordp (nth 0 handler))
+                                                      (listp (nth 1 handler))))))
                  (error 'url-regex-sugar
                         :url url
                         :handler handler))
@@ -192,7 +200,7 @@
              (format stream "~%Decanter Error~%~%")
              (format stream "  URL regex sugar read macro must be of form: #?\"url\" handler~%")
              (format stream "  where \"url\" is a string literal containing a cl-ppcre~%")
-             (format stream "  compatible regular expression and handler is a symbol literal.~%~%")
+             (format stream "  compatible regular expression and handler is either a symbol literal or form in the app macro.~%~%")
              (format stream "  * URL: ~s~%" (e-url condition))
              (format stream "  * Handler: ~s~%~%" (e-handler condition)))))
 
@@ -1759,3 +1767,39 @@
               (with-output-to-string (spinneret:*html*)
                 (setf ,returned-str (spinneret:with-html ,@body)))))
        (if ,returned-str ,returned-str ,written-html))))
+
+;; -----------------------------------------------------------------------------
+
+(defmacro app (app &body body)
+  (let ((urls-sym (gensym))
+        (urls '())
+        (handler-definitions '()))
+    (labels ((flatten-regex-sugar-forms (body)
+               (mapcar (lambda (start-subform)
+                         (if (and (= (length start-subform) 1)
+                                  (listp (car start-subform))
+                                  (find :regex (car start-subform)))
+                             (car start-subform)
+                             start-subform))
+                       body)))
+      (mapcar (lambda (start-subform)
+                (let ((pattern (car start-subform))
+                      (regex-p nil)
+                      (subhandlers (cdr start-subform))
+                      (handler-sym (gensym)))
+                  (when (eq :regex (first subhandlers))
+                    (setf regex-p t)
+                    (setf subhandlers (cdr subhandlers)))
+                  (setf urls (append urls (if regex-p
+                                              (list pattern :regex handler-sym)
+                                              (list pattern handler-sym))))
+                  (setf handler-definitions (append handler-definitions
+                                                    (list `(defhandler
+                                                               ,handler-sym
+                                                             ,@subhandlers))))))
+              (flatten-regex-sugar-forms body)))
+    `(progn
+       (defurls ,urls-sym (quote ,urls))
+       (defapp ,app ,urls-sym)
+       ,@handler-definitions
+       (run ,app))))
