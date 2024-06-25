@@ -621,44 +621,44 @@
                        return form))
              (wrap-subhandler (form)
                (if form
-                   (macroexpand-1 `(subhandler application request pattern pattern-matches ,form))
-                   `(lambda (application request pattern pattern-matches &key &allow-other-keys)
-                      (declare (ignore application pattern-matches))
+                   (macroexpand-1 `(subhandler ,application ,request ,pattern ,pattern-matches ,form))
+                   `(lambda (,application ,request ,pattern ,pattern-matches &key &allow-other-keys)
+                      (declare (ignore ,application ,pattern-matches))
                       (error 'request-method-not-implemented
-                             :method (request-method request)
-                             :target (target request)
-                             :pattern pattern)))))
+                             :method (request-method ,request)
+                             :target (target ,request)
+                             :pattern ,pattern)))))
       `(defun ,handler-name ,lambda-list
          (macrolet ((handler-url (handler &rest rest)
-                      `(handler-url-tl application ,handler ,@rest))
+                      `(handler-url-tl ,(quote ,application) ,handler ,@rest))
                     (static-url (&key
                                    path
                                    (subpath "")
                                    filename
                                    pathname)
-                      `(static-url-tl application
+                      `(static-url-tl ,(quote ,application)
                                       :path ,path
                                       :subpath ,subpath
                                       :filename ,filename
                                       :pathname ,pathname))
                     (session-id ()
-                      `(session-id-tl request))
+                      `(session-id-tl ,(quote ,request)))
                     (session-options ()
-                      `(session-options-tl request))
+                      `(session-options-tl ,(quote ,request)))
                     (session-table ()
-                      `(session-table-tl request))
+                      `(session-table-tl ,(quote ,request)))
                     (session (key)
-                      `(session-tl request ,key))
+                      `(session-tl ,(quote ,request) ,key))
                     (set-session (key value)
-                      `(set-session-tl request ,key ,value))
+                      `(set-session-tl ,(quote ,request) ,key ,value))
                     (rem-session (key)
-                      `(rem-session-tl request ,key))
+                      `(rem-session-tl ,(quote ,request) ,key))
                     (clear-session ()
-                      `(clear-session-tl request)))
+                      `(clear-session-tl ,(quote ,request))))
            (apply
             (funcall
              (lambda ()
-               (case (request-method request)
+               (case (request-method ,request)
                  (:get     ,(wrap-subhandler (form-by-method :get     body)))
                  (:head    ,(wrap-subhandler (form-by-method :head    body)))
                  (:post    ,(wrap-subhandler (form-by-method :post    body)))
