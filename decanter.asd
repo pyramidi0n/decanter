@@ -35,5 +35,3 @@
                "vom")
   :components ((:module "src"
                 :components ((:file "main.lisp" :pathname "main")))))
-
-(defsystem "decanter.ext.db" :depends-on ("extensions/db/decanter.ext.db"))

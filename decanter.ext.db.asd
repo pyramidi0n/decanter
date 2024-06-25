@@ -7,5 +7,5 @@
 
                "dbi"
                "sxql")
-  :components ((:module "src"
-                :components ((:file "main.lisp" :pathname "main")))))
+  :components ((:module "extensions"
+                :components ((:file "main.lisp" :pathname "db/src/main")))))
