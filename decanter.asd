@@ -30,7 +30,6 @@
                "quri"
                "spinneret"
                "uiop"
-               "uri-parse"
                "woo"
                "vom")
   :components ((:module "src"

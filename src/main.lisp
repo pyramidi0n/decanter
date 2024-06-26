@@ -1605,12 +1605,18 @@
   ;; throwaway scheme in doing so.
   ;;
   ;; See: https://www.rfc-editor.org/rfc/rfc9110.html#name-connect
-  (multiple-value-bind (scheme userinfo host port path query fragment)
-      (uri-parse:parse (concatenate 'string "http://" (target request)))
+  (let* ((uri-object (quri:uri (concatenate 'string "http://" (target request))))
+         (scheme (quri:uri-scheme uri-object))
+         (userinfo (quri:uri-userinfo uri-object))
+         (host (quri:uri-host uri-object))
+         (port (quri:uri-port uri-object))
+         (path (quri:uri-path uri-object))
+         (query (quri:uri-query-params uri-object))
+         (fragment (quri:uri-fragment uri-object)))
     (if (and (stringp scheme)
              (null userinfo)
              (stringp host)
-             (stringp port)
+             (integerp port)
              (null path)
              (null query)
              (null fragment))
