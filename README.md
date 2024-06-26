@@ -2,6 +2,10 @@
 
 A micro web framework that gets out of your way.
 
+For general information, check [here](https://decanter.cddr.io/).
+
+Thorough documentation is available [here](https://decanter.cddr.io/docs/).
+
 ## Table of Contents
 
 1. [Installation](#installation)
