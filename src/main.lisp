@@ -583,8 +583,8 @@
                        for func in request-param-functions
                        collect `(setf ,name (funcall (eval ,func) ,name)))))
           `(lambda ,(append
-                (list application request pattern pattern-matches)
-                `(&key ,@request-param-names &allow-other-keys))
+                     (list application request pattern pattern-matches)
+                     `(&key ,@request-param-names &allow-other-keys))
              (declare (ignorable ,application ,request ,pattern ,pattern-matches))
              ,@request-param-setfs
              ,@forms))))))
@@ -1230,18 +1230,14 @@
                (let ((session-store (make-memory-store)))
                  ;; Apparently Lack's session middleware defaults to creating a
                  ;; new memory store for each request. This means that any use
-                 ;; of the session hash table is, by default, useless, since
-                 ;; that table is blown away and recreated. Every single time.
+                 ;; of the session hash table does not persist across requests.
                  ;;
-                 ;; Nevertheless, this hash table is accessible in the Clack
-                 ;; environment, which suggests that it might have utility.
-                 ;; But, no, apparently you have to fuck around before it's
-                 ;; useful.
+                 ;; Nevertheless, the hash table is accessible in the Clack
+                 ;; environment, which is a bit deceptive in that it might
+                 ;; suggest out of the box utility.
                  ;;
-                 ;; Why this is the default behavior? I have no idea. It's not
-                 ;; like there's any documentation.
-                 ;;
-                 ;; "There are five libraries, and all of them suck."
+                 ;; So, we create a session store here instead, which does stick
+                 ;; around across requests.
                  (when session
                    (push (lambda (app)
                            (funcall *middleware-session* app :store session-store))
