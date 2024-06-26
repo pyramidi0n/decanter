@@ -48,6 +48,16 @@ A minimal Decanter application:
 (require :decanter)
 (use-package :decanter)
 
+(app *app*
+  ("/" (:get () "Hello, world!")))
+```
+
+Or:
+
+```lisp
+(require :decanter)
+(use-package :decanter)
+
 (defurls *urls*
     '("/" hello))
 
