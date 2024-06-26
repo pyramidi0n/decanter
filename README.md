@@ -17,14 +17,6 @@ Thorough documentation is available [here](https://decanter.cddr.io/docs/).
 
 ## Installation
 
-Some of Decanter's dependencies make heavy use of inline functions to achieve
-performance. Consequently, compiling it can be memory-hungry. Starting your
-Lisp implementation with a fair amount of dynamic space is recommended, e.g.
-
-```bash
-$ sbcl --dynamic-space-size 16384
-```
-
 Decanter is available on [Ultralisp](https://ultralisp.org/) and is easy to
 install using [Quicklisp](https://www.quicklisp.org/beta/).
 
